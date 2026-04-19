@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { LogOut } from "lucide-react";
 import { ReactNode } from "react";
 
 export function AppShell({
@@ -16,6 +19,17 @@ export function AppShell({
   right?: ReactNode;
   eyebrow?: ReactNode;
 }) {
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await fetch("/api/logout", { method: "POST" });
+    } catch {}
+    router.push("/");
+  }
+
   return (
     <div className="min-h-screen bg-ink-50/40 text-ink-900">
       <header className="sticky top-0 z-30 border-b border-ink-100 bg-white/80 backdrop-blur-xl">
@@ -31,7 +45,19 @@ export function AppShell({
               </div>
             </div>
           </Link>
-          <div>{right}</div>
+          <div className="flex items-center gap-3">
+            {right}
+            <button
+              onClick={signOut}
+              disabled={signingOut}
+              title="Sign out"
+              aria-label="Sign out"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-ink-200 bg-white px-2.5 py-1.5 text-xs font-bold text-ink-700 transition hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-60"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
+          </div>
         </div>
       </header>
       {(title || subtitle || eyebrow) && (
