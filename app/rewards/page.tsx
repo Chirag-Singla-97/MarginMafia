@@ -20,7 +20,7 @@ function RewardsInner() {
   useEffect(() => {
     fetch("/api/bootstrap").then((r) => r.json()).then(async (boot) => {
       if (!boot.retailer) return router.replace("/");
-      if (!boot.territory) return router.replace("/distributor");
+      if (!boot.confirmed) return router.replace("/confirm");
       if (!boot.team) return router.replace("/team");
       setRetailer(boot.retailer);
       setTerritory(boot.territory);

@@ -10,14 +10,14 @@ import { TeamDrawer } from "@/components/team-drawer";
 import { Avatar } from "@/components/avatar";
 import { useTeamStore } from "@/store/team-store";
 import { CATEGORIES, type Product, type CategoryId } from "@/lib/types";
-import { canAdd } from "@/lib/team-rules";
+import { canAdd, TOTAL_PICKS } from "@/lib/team-rules";
 
 export default function TeamBuilderPage() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [retailer, setRetailer] = useState<any>(null);
   const [territory, setTerritory] = useState<any>(null);
-  const [activeCat, setActiveCat] = useState<CategoryId>("plant-nutrition");
+  const [activeCat, setActiveCat] = useState<CategoryId>("spec-plant-nutrition");
   const [search, setSearch] = useState("");
   const [subFilter, setSubFilter] = useState("all");
   const [detail, setDetail] = useState<Product | null>(null);
@@ -30,7 +30,7 @@ export default function TeamBuilderPage() {
     Promise.all([fetch("/api/bootstrap").then((r) => r.json()), fetch("/api/products").then((r) => r.json())]).then(
       ([boot, prods]) => {
         if (!boot.retailer) return router.replace("/");
-        if (!boot.distributor) return router.replace("/distributor");
+        if (!boot.confirmed) return router.replace("/confirm");
         setRetailer(boot.retailer);
         setTerritory(boot.territory);
         setProducts(prods.products);
@@ -42,7 +42,13 @@ export default function TeamBuilderPage() {
   const productsById = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
   const byCategory = useMemo(() => {
-    const map: Record<CategoryId, Product[]> = { "plant-nutrition": [], "crop-protection": [], seeds: [] };
+    const map: Record<CategoryId, Product[]> = {
+      "spec-plant-nutrition": [],
+      "crop-protection": [],
+      "veg-seeds": [],
+      "hybrid-seeds": [],
+      "research-seeds": [],
+    };
     for (const p of products) map[p.category].push(p);
     return map;
   }, [products]);
@@ -87,15 +93,16 @@ export default function TeamBuilderPage() {
     <AppShell
       eyebrow={
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="chip">Step 2 of 3 · Build team</span>
+          <span className="chip">Step 2 of 2 · Build team</span>
           {territory && (
             <span className="chip chip-field"><MapPin className="h-3 w-3" /> {territory.name}</span>
           )}
           <span className="chip chip-brand"><Clock className="h-3 w-3" /> Selection window · closes soon</span>
+          <span className="chip">{picks.length}/{TOTAL_PICKS} picks</span>
         </div>
       }
       title="Pick your squad"
-      subtitle={`${products.length} products available · 1–3 from each category · mark a Captain (2×) and Vice-Captain (1.5×).`}
+      subtitle={`${products.length} products · 1–3 from each of 5 categories · total exactly ${TOTAL_PICKS} · mark a Captain (2×) and Vice-Captain (1.5×).`}
       right={retailer && (
         <div className="flex items-center gap-2.5">
           <Avatar seed={retailer.avatarSeed} name={retailer.name} size={40} />

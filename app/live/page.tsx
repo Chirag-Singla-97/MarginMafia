@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Trophy, Crown, Award, ArrowRight, RadioTower, TrendingUp, Users } from "lucide-react";
+import { Trophy, Crown, Award, ArrowRight, RadioTower, TrendingUp, Users, PackagePlus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Avatar } from "@/components/avatar";
 import { LeaderboardTable } from "@/components/leaderboard-table";
@@ -15,7 +15,21 @@ import { formatPoints } from "@/lib/utils";
 interface MyTeamDetail {
   team: { retailerId: string; captainId: string; viceCaptainId: string };
   retailer: any;
-  score: { total: number; breakdown: { productId: string; finalPoints: number; isCaptain: boolean; isViceCaptain: boolean }[] };
+  score: {
+    total: number;
+    breakdown: {
+      productId: string;
+      finalPoints: number;
+      rawPts: number;
+      salesPts: number;
+      brPts: number;
+      repeatPts: number;
+      pogPts: number;
+      multiplier: number;
+      isCaptain: boolean;
+      isViceCaptain: boolean;
+    }[];
+  };
   picks: { productId: string; category: string; product: Product | null }[];
 }
 
@@ -28,23 +42,38 @@ function LivePageInner() {
   const [peek, setPeek] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
 
+  const reload = useCallback(async (stId: string, myId: string) => {
+    const [lb, mine] = await Promise.all([
+      fetch(`/api/leaderboard?stId=${stId}`).then((r) => r.json()),
+      fetch(`/api/team/${myId}`).then((r) => r.json()),
+    ]);
+    setRows(lb.rows || []);
+    setMyTeam(mine);
+  }, []);
+
   useEffect(() => {
+    let stopped = false;
+    let timer: any;
     fetch("/api/bootstrap").then((r) => r.json()).then(async (boot) => {
       if (!boot.retailer) return router.replace("/");
-      if (!boot.territory) return router.replace("/distributor");
+      if (!boot.confirmed) return router.replace("/confirm");
       if (!boot.team) return router.replace("/team");
       setRetailer(boot.retailer);
       setTerritory(boot.territory);
-
-      const [lb, mine] = await Promise.all([
-        fetch(`/api/leaderboard?stId=${boot.territory.id}`).then((r) => r.json()),
-        fetch(`/api/team/${boot.retailer.id}`).then((r) => r.json()),
-      ]);
-      setRows(lb.rows);
-      setMyTeam(mine);
+      await reload(boot.territory.id, boot.retailer.id);
       setLoaded(true);
+      const tick = async () => {
+        if (stopped) return;
+        await reload(boot.territory.id, boot.retailer.id);
+        timer = setTimeout(tick, 15000);
+      };
+      timer = setTimeout(tick, 15000);
     });
-  }, [router]);
+    return () => {
+      stopped = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [router, reload]);
 
   const myRank = useMemo(() => rows.find((r) => r.isYou)?.rank ?? null, [rows]);
   const myPoints = useMemo(() => rows.find((r) => r.isYou)?.totalPoints ?? 0, [rows]);
@@ -62,14 +91,16 @@ function LivePageInner() {
         </div>
       }
       title="Live Leaderboard"
-      subtitle="Points update whenever your picks sell. Captain scores 2×, Vice-Captain 1.5×."
+      subtitle="Points update as your picks sell in your territory. Add POG for extra points. Captain scores 2×, Vice-Captain 1.5×."
       right={retailer && (
-        <Link href="/rewards" className="hidden sm:inline-flex btn btn-outline"><Trophy className="h-4 w-4" /> Preview rewards</Link>
+        <div className="flex items-center gap-2">
+          <Link href="/pog" className="inline-flex btn btn-outline"><PackagePlus className="h-4 w-4" /> POG</Link>
+          <Link href="/rewards" className="hidden sm:inline-flex btn btn-outline"><Trophy className="h-4 w-4" /> Rewards</Link>
+        </div>
       )}
     >
       <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
         <div className="space-y-5">
-          {/* Stat strip */}
           <div className="grid gap-3 sm:grid-cols-3">
             <StatCard label="Your rank" value={myRank ? `#${myRank}` : "—"} sub={`of ${rows.length} retailers`} />
             <StatCard label="Your points" value={formatPoints(myPoints)} sub="this month" tint="brand" />
@@ -81,11 +112,10 @@ function LivePageInner() {
             />
           </div>
 
-          {/* Live banner */}
           <div className="flex items-center gap-3 rounded-xl border border-field-200 bg-field-50 px-4 py-3">
             <RadioTower className="h-4 w-4 text-field-700" />
             <span className="flex-1 text-sm font-semibold text-field-800">
-              Points updating live as products sell in {territory?.name}
+              Refreshing every 15s · points = sales + BR + repeat + your POG (× C/VC)
             </span>
             <span className="dot-live h-2 w-2" />
           </div>
@@ -145,7 +175,12 @@ function LivePageInner() {
                                   {isC && <span className="chip chip-gold"><Crown className="h-2.5 w-2.5" /> C</span>}
                                   {isVC && <span className="chip chip-silver"><Award className="h-2.5 w-2.5" /> VC</span>}
                                 </div>
-                                <div className="truncate text-[10px] text-ink-500">{p.subCategory}</div>
+                                {b && (
+                                  <div className="truncate text-[10px] text-ink-500">
+                                    S {formatPoints(b.salesPts)} · BR {formatPoints(b.brPts)} · R {formatPoints(b.repeatPts)}
+                                    {b.pogPts > 0 && <> · <span className="text-field-700 font-bold">POG {formatPoints(b.pogPts)}</span></>}
+                                  </div>
+                                )}
                               </div>
                               <div className="shrink-0 text-right">
                                 <div className="font-display text-base font-bold tabular-nums">{formatPoints(b?.finalPoints || 0)}</div>
@@ -163,8 +198,8 @@ function LivePageInner() {
               </div>
             </div>
 
-            <Link href="/rewards" className="btn btn-brand btn-lg w-full">
-              See month-end rewards <ArrowRight className="h-4 w-4" />
+            <Link href="/pog" className="btn btn-brand btn-lg w-full">
+              <PackagePlus className="h-4 w-4" /> Log POG for bonus points <ArrowRight className="h-4 w-4" />
             </Link>
           </aside>
         )}

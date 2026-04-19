@@ -3,9 +3,8 @@
 import { useMemo, useState } from "react";
 import { Crown, Award, ChevronUp, ChevronDown, X, AlertCircle, ShieldCheck, Lock } from "lucide-react";
 import { useTeamStore } from "@/store/team-store";
-import { validateTeam } from "@/lib/team-rules";
+import { validateTeam, TOTAL_PICKS } from "@/lib/team-rules";
 import { CATEGORIES, type Product } from "@/lib/types";
-import { formatPoints } from "@/lib/utils";
 
 export function TeamDrawer({
   productsById,
@@ -26,30 +25,17 @@ export function TeamDrawer({
     items: picks.filter((p) => p.category === c.id),
   }));
 
-  const totalPoints = useMemo(() => {
-    let sum = 0;
-    for (const p of picks) {
-      const prod = productsById.get(p.productId);
-      if (!prod) continue;
-      const base = prod.basePoints * prod.saleVelocity;
-      const mult = p.productId === captainId ? 2 : p.productId === viceCaptainId ? 1.5 : 1;
-      sum += base * mult;
-    }
-    return sum;
-  }, [picks, captainId, viceCaptainId, productsById]);
-
   const contents = (
     <TeamContents
-      picks={picks}
       captainId={captainId}
       viceCaptainId={viceCaptainId}
       productsById={productsById}
       groupedPicks={groupedPicks}
+      picks={picks}
       remove={remove}
       setCaptain={setCaptain}
       setViceCaptain={setViceCaptain}
       result={result}
-      totalPoints={totalPoints}
       onSubmit={onSubmit}
       busy={busy}
     />
@@ -65,7 +51,7 @@ export function TeamDrawer({
         >
           <div className="text-left">
             <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-ink-400">My team</div>
-            <div className="font-display text-base font-bold">{picks.length}/9 picks · {formatPoints(totalPoints)} pts</div>
+            <div className="font-display text-base font-bold">{picks.length}/{TOTAL_PICKS} picks</div>
           </div>
           <div className="flex items-center gap-2">
             {result.valid ? (
@@ -95,10 +81,10 @@ export function TeamDrawer({
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/50">Your team</div>
-                <div className="font-display text-2xl font-bold">{formatPoints(totalPoints)}<span className="text-sm text-white/50 font-normal"> pts</span></div>
+                <div className="font-display text-2xl font-bold">{picks.length}<span className="text-sm text-white/50 font-normal">/{TOTAL_PICKS} picks</span></div>
               </div>
               <div className="flex flex-col items-end gap-1">
-                <span className="chip chip-dark">{picks.length}/9</span>
+                <span className="chip chip-dark">{picks.length}/{TOTAL_PICKS}</span>
                 {result.valid ? (
                   <span className="chip chip-field"><ShieldCheck className="h-3 w-3" /> Ready</span>
                 ) : picks.length > 0 && (
@@ -128,7 +114,6 @@ function TeamContents({
   setCaptain,
   setViceCaptain,
   result,
-  totalPoints,
   onSubmit,
   busy,
 }: any) {
@@ -138,7 +123,7 @@ function TeamContents({
         <div className="flex flex-1 flex-col items-center justify-center text-center py-10">
           <div className="text-5xl">🌾</div>
           <div className="mt-3 font-display text-base font-bold text-ink-900">Your squad is empty</div>
-          <div className="mt-1 text-xs text-ink-500 max-w-[220px]">Pick 1–3 products from each of the 3 categories to build your team.</div>
+          <div className="mt-1 text-xs text-ink-500 max-w-[220px]">Pick 1–3 from each of the 5 categories. Total = {TOTAL_PICKS}.</div>
         </div>
       ) : (
         <div className="flex-1 space-y-4">

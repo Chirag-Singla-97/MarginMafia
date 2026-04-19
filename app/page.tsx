@@ -2,50 +2,67 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Trophy, Users, Zap, Crown, Award, Sparkles, Flame } from "lucide-react";
+import { ArrowRight, Trophy, Users, Zap, Crown, Award, Sparkles, Flame, Phone, MapPin, LogOut } from "lucide-react";
+
+type ResumeState = {
+  retailer: { name: string; shopName: string; phone: string; avatarSeed: string };
+  nextPath: string;
+  nextLabel: string;
+} | null;
 
 export default function LoginPage() {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [shopName, setShopName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [pincode, setPincode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [notRegistered, setNotRegistered] = useState(false);
+  const [resume, setResume] = useState<ResumeState>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     fetch("/api/bootstrap")
       .then((r) => r.json())
       .then((data) => {
-        if (data.retailer) {
-          if (!data.distributor) router.replace("/distributor");
-          else if (!data.team) router.replace("/team");
-          else router.replace("/live");
-        }
+        if (!data.retailer) return;
+        const nextPath = !data.confirmed ? "/confirm" : !data.team ? "/team" : "/live";
+        const nextLabel = !data.confirmed ? "Confirm your details" : !data.team ? "Pick your team" : "View leaderboard";
+        setResume({ retailer: data.retailer, nextPath, nextLabel });
       })
       .catch(() => {});
-  }, [router]);
+  }, []);
+
+  async function signOut() {
+    setSigningOut(true);
+    await fetch("/api/logout", { method: "POST" }).catch(() => {});
+    setResume(null);
+    setSigningOut(false);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
-    if (!name.trim()) return setErr("Please enter your name");
+    setNotRegistered(false);
+    if (!/^\d{10}$/.test(phone)) return setErr("Enter a 10-digit phone number.");
+    if (!/^\d{6}$/.test(pincode)) return setErr("Enter a 6-digit pincode.");
     setBusy(true);
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), shopName: shopName.trim() }),
+      body: JSON.stringify({ phone, pincode }),
     });
+    const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const j = await res.json().catch(() => ({}));
-      setErr(j.error || "Login failed");
+      if (body.registered === false) setNotRegistered(true);
+      else setErr(body.error || "Login failed");
       setBusy(false);
       return;
     }
-    router.push("/distributor");
+    router.push("/confirm");
   }
 
   return (
     <div className="relative min-h-screen overflow-hidden hero-mesh noise">
-      {/* Floating blobs */}
       <div aria-hidden className="pointer-events-none absolute -top-24 -left-24 h-96 w-96 rounded-full bg-brand-300/40 blur-3xl animate-float-slow" />
       <div aria-hidden className="pointer-events-none absolute top-1/3 -right-20 h-80 w-80 rounded-full bg-field-300/40 blur-3xl animate-float-slower" />
       <div aria-hidden className="pointer-events-none absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-amber-200/50 blur-3xl animate-float-slow" />
@@ -68,7 +85,6 @@ export default function LoginPage() {
       </header>
 
       <main className="relative z-10 mx-auto grid max-w-6xl items-start gap-10 px-6 py-8 md:grid-cols-[1.3fr_1fr] md:gap-14 md:py-16">
-        {/* Hero content */}
         <section>
           <span className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-white/80 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-brand-700 backdrop-blur">
             <Flame className="h-3 w-3" /> Dream11 · but for agri products
@@ -86,68 +102,95 @@ export default function LoginPage() {
           </h1>
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-ink-600">
-            Pick a squad of <b className="text-ink-900">agri products</b>. Earn points every time they sell in your sales territory. Beat fellow retailers on a live leaderboard. <b className="text-ink-900">Win real cash every month.</b>
+            Pick a squad of <b className="text-ink-900">11 agri products</b>. Earn points every time they sell in your sales territory, plus bonuses for your own shop's POG. Beat fellow retailers on a live leaderboard. <b className="text-ink-900">Win real cash every month.</b>
           </p>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            <Feature icon={<Zap className="h-4 w-4" />} tint="brand" title="3–9 product squad" body="1–3 from each category." />
+            <Feature icon={<Zap className="h-4 w-4" />} tint="brand" title="11-product squad" body="1–3 from each of 5 categories." />
             <Feature icon={<Crown className="h-4 w-4" />} tint="amber" title="Captain 2×" body="Vice-captain 1.5×." />
             <Feature icon={<Trophy className="h-4 w-4" />} tint="field" title="Monthly cash" body="Podium = ₹5K/₹3K/₹1.5K." />
           </div>
-
-          {/* Mock scoreboard */}
-          <div className="mt-10 hidden rounded-2xl border border-ink-100 bg-white/80 p-4 shadow-card backdrop-blur md:block">
-            <div className="mb-3 flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ink-400">Live · North Zone</span>
-              <span className="chip chip-field"><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-field-500 animate-pulse" /> 12 playing now</span>
-            </div>
-            <div className="space-y-2">
-              <MockRow rank={1} name="Rajesh Kumar" shop="Kumar Beej Bhandar" pts={18420} gold />
-              <MockRow rank={2} name="Ravi Verma" shop="Verma Khaad Bhandar" pts={17102} />
-              <MockRow rank={3} name="Amit Yadav" shop="Yadav Kisan Kendra" pts={15980} />
-            </div>
-          </div>
         </section>
 
-        {/* Login card */}
         <section className="relative">
           <div className="card-elev relative overflow-hidden p-6 sm:p-7">
             <div aria-hidden className="pointer-events-none absolute -top-16 -right-16 h-40 w-40 rounded-full bg-brand-200/50 blur-2xl" />
             <div className="relative">
               <div className="mb-5 flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-brand-500" />
-                <h2 className="font-display text-xl font-bold">Start playing in 60 seconds</h2>
+                <h2 className="font-display text-xl font-bold">Sign in with your retailer phone</h2>
               </div>
-              <p className="-mt-3 mb-5 text-sm text-ink-500">No signup, no OTP. Just your name.</p>
+              <p className="-mt-3 mb-5 text-sm text-ink-500">We'll match your number to the retailer database and auto-fill your distributor, territory & town.</p>
+
+              {resume && (
+                <div className="mb-5 rounded-xl border border-brand-200 bg-gradient-to-br from-brand-50 to-amber-50 p-4">
+                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand-700">Already signed in</div>
+                  <div className="mt-1 font-display text-base font-bold text-ink-900">{resume.retailer.name}</div>
+                  <div className="text-xs text-ink-500">{resume.retailer.shopName} · {resume.retailer.phone}</div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => router.push(resume.nextPath)}
+                      className="btn btn-brand flex-1"
+                    >
+                      {resume.nextLabel} <ArrowRight className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={signOut}
+                      disabled={signingOut}
+                      className="btn btn-outline"
+                    >
+                      <LogOut className="h-4 w-4" /> Switch retailer
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <form onSubmit={submit} className="space-y-4">
                 <div>
-                  <label className="label">Your name</label>
-                  <input
-                    className="input"
-                    placeholder="e.g. Ramesh Kumar"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    autoFocus
-                  />
+                  <label className="label">Phone number</label>
+                  <div className="relative">
+                    <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+                    <input
+                      className="input pl-10"
+                      placeholder="10-digit mobile"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                      autoFocus
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="label">Shop name <span className="text-ink-300 font-semibold">(optional)</span></label>
-                  <input
-                    className="input"
-                    placeholder="e.g. Kumar Beej Bhandar"
-                    value={shopName}
-                    onChange={(e) => setShopName(e.target.value)}
-                  />
+                  <label className="label">Shop pincode</label>
+                  <div className="relative">
+                    <MapPin className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" />
+                    <input
+                      className="input pl-10"
+                      placeholder="6-digit pincode"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    />
+                  </div>
                 </div>
+                {notRegistered && (
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-800">
+                    <b>This number isn't onboarded yet.</b>
+                    <div className="mt-0.5">Please complete retailer onboarding on the company platform first, then come back and sign in.</div>
+                  </div>
+                )}
                 {err && <div className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{err}</div>}
                 <button type="submit" disabled={busy} className="btn btn-brand btn-lg w-full">
-                  {busy ? "Setting up your field…" : (
-                    <>Enter the League <ArrowRight className="h-4 w-4" /></>
+                  {busy ? "Looking you up…" : (
+                    <>Continue <ArrowRight className="h-4 w-4" /></>
                   )}
                 </button>
                 <p className="text-center text-[11px] text-ink-400">
-                  By entering, you agree you're a retailer playing for fun & glory.
+                  We only use your phone to identify your retailer record. No OTP for this demo.
                 </p>
               </form>
             </div>
@@ -173,24 +216,6 @@ function Feature({ icon, title, body, tint }: { icon: React.ReactNode; title: st
       <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${tints[tint]}`}>{icon}</div>
       <h3 className="mt-3 text-sm font-bold text-ink-900">{title}</h3>
       <p className="mt-0.5 text-xs text-ink-500">{body}</p>
-    </div>
-  );
-}
-
-function MockRow({ rank, name, shop, pts, gold }: { rank: number; name: string; shop: string; pts: number; gold?: boolean }) {
-  return (
-    <div className="flex items-center gap-3">
-      <div className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold ${
-        gold ? "bg-amber-400 text-white" : "bg-ink-100 text-ink-600"
-      }`}>#{rank}</div>
-      <div className="flex-1 min-w-0">
-        <div className="truncate text-sm font-semibold text-ink-900">{name}</div>
-        <div className="truncate text-[11px] text-ink-400">{shop}</div>
-      </div>
-      <div className="text-right">
-        <div className="font-display text-base font-bold tabular-nums">{pts.toLocaleString()}</div>
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-400">pts</div>
-      </div>
     </div>
   );
 }

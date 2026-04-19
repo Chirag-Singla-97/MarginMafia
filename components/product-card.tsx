@@ -1,8 +1,8 @@
 "use client";
 
-import { Info, Plus, Check, Sparkles, Crown, Award } from "lucide-react";
+import { Info, Plus, Check, Crown, Award } from "lucide-react";
 import type { Product } from "@/lib/types";
-import { CATEGORIES } from "@/lib/types";
+import { CATEGORIES, CATEGORY_ACCENTS } from "@/lib/types";
 
 export function ProductCard({
   product,
@@ -22,10 +22,7 @@ export function ProductCard({
   isViceCaptain?: boolean;
 }) {
   const cat = CATEGORIES.find((c) => c.id === product.category)!;
-  const accent =
-    cat.id === "plant-nutrition" ? "chip-field" :
-    cat.id === "crop-protection" ? "chip-brand" :
-    "chip-dark";
+  const accent = CATEGORY_ACCENTS[product.category];
 
   return (
     <div
@@ -35,12 +32,7 @@ export function ProductCard({
           : "border-ink-100 hover:border-ink-200 hover:shadow-card"
       }`}
     >
-      {/* Top color strip by category */}
-      <div className={`h-1 w-full ${
-        cat.id === "plant-nutrition" ? "bg-gradient-to-r from-field-400 to-field-600" :
-        cat.id === "crop-protection" ? "bg-gradient-to-r from-brand-400 to-brand-600" :
-        "bg-gradient-to-r from-ink-600 to-ink-900"
-      }`} />
+      <div className={`h-1 w-full ${accent.bar}`} />
 
       {(isCaptain || isViceCaptain) && (
         <div className={`absolute top-3 right-3 flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold text-white shadow-md ${
@@ -52,7 +44,7 @@ export function ProductCard({
 
       <div className="flex flex-1 flex-col p-4">
         <div className="mb-2 flex flex-wrap gap-1.5">
-          <span className={`chip ${accent}`}>
+          <span className={`chip ${accent.chip}`}>
             <span className="text-[10px]">{cat.emoji}</span>
             <span className="truncate max-w-[140px]">{product.subCategory || cat.name}</span>
           </span>
@@ -72,16 +64,6 @@ export function ProductCard({
         </div>
 
         <div className="mt-auto pt-4">
-          <div className="mb-3 flex items-center justify-between border-t border-dashed border-ink-100 pt-3">
-            <div className="flex items-center gap-1 text-[11px] font-bold text-brand-600">
-              <Sparkles className="h-3 w-3" />
-              <span>{Math.round(product.basePoints)} base pts</span>
-            </div>
-            <div className="text-[10px] font-bold uppercase tracking-wider text-ink-400">
-              {product.saleVelocity.toFixed(2)}× velocity
-            </div>
-          </div>
-
           <div className="flex items-center gap-2">
             <button
               onClick={onInfo}

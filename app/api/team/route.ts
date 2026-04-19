@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { getCurrentRetailerId } from "@/lib/session";
-import { saveTeam, getTeam } from "@/lib/data/store";
+import { repo } from "@/lib/data/repo";
 import { validateTeam, type DraftTeam } from "@/lib/team-rules";
 import type { Team } from "@/lib/types";
 
 export async function GET() {
   const id = getCurrentRetailerId();
   if (!id) return NextResponse.json({ error: "Not logged in" }, { status: 401 });
-  return NextResponse.json({ team: getTeam(id) || null });
+  return NextResponse.json({ team: repo.getTeam(id) ?? null });
 }
 
 export async function POST(req: Request) {
@@ -21,7 +21,9 @@ export async function POST(req: Request) {
     viceCaptainId: body.viceCaptainId ?? null,
   };
   const result = validateTeam(draft);
-  if (!result.valid) return NextResponse.json({ error: "Invalid team", details: result.errors }, { status: 400 });
+  if (!result.valid) {
+    return NextResponse.json({ error: "Invalid team", details: result.errors }, { status: 400 });
+  }
 
   const team: Team = {
     retailerId: id,
@@ -29,6 +31,6 @@ export async function POST(req: Request) {
     captainId: draft.captainId!,
     viceCaptainId: draft.viceCaptainId!,
   };
-  const saved = saveTeam(team);
+  const saved = repo.saveTeam(team);
   return NextResponse.json({ team: saved });
 }

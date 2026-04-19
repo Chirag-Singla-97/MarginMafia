@@ -1,14 +1,26 @@
 import { NextResponse } from "next/server";
-import { getCurrentRetailer } from "@/lib/session";
-import { getSeedData } from "@/lib/data/seed";
-import { getTeam } from "@/lib/data/store";
+import { getCurrentRetailer, isConfirmed } from "@/lib/session";
+import { ensureSheetsWarm, repo } from "@/lib/data/repo";
 
 export async function GET() {
+  await ensureSheetsWarm();
   const retailer = getCurrentRetailer();
   if (!retailer) return NextResponse.json({ retailer: null });
-  const { distributors, territories } = getSeedData();
-  const distributor = distributors.find((d) => d.id === retailer.distributorId) || null;
-  const territory = distributor ? territories.find((t) => t.id === distributor.salesTerritoryId) || null : null;
-  const team = getTeam(retailer.id) || null;
-  return NextResponse.json({ retailer, distributor, territory, team });
+
+  const distributor = repo.getDistributor(retailer.distributorId);
+  const territory = repo.getTerritory(retailer.salesTerritoryId);
+  const pincode = repo.getRetailerPincode(retailer.id);
+  const town = pincode ? repo.getTownByPincode(pincode) : null;
+  const team = repo.getSavedTeam(retailer.id);
+  const confirmed = isConfirmed();
+
+  return NextResponse.json({
+    retailer,
+    distributor,
+    territory,
+    town,
+    pincode,
+    confirmed,
+    team,
+  });
 }

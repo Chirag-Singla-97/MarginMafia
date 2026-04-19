@@ -1,51 +1,78 @@
-import { seededFloat, seededInt } from "./utils";
-import type { Product, Team } from "./types";
+import type { POGEntry, Product, ProductSalesStat, Team } from "./types";
 
 export const CURRENT_MONTH_ID = "2026-04";
 
-export function computeBasePoints(productId: string): number {
-  return seededInt(`base:${productId}`, 20, 100);
-}
+export const POINTS_PER_100_SALES = 10;
+export const POINTS_PER_100_BR = 15;
+export const POINTS_PER_REPEAT = 5;
+export const POINTS_PER_100_POG = 20;
 
-export function computeSaleVelocity(productId: string): number {
-  return seededFloat(`velocity:${productId}`, 0.5, 2.0);
-}
-
-export function monthlyBump(productId: string, monthId: string): number {
-  return seededFloat(`bump:${productId}:${monthId}`, 0.75, 1.35);
-}
-
-export function productMonthPoints(product: Product, monthId = CURRENT_MONTH_ID): number {
-  return product.basePoints * product.saleVelocity * monthlyBump(product.id, monthId);
+export interface ScoreBreakdown {
+  productId: string;
+  isCaptain: boolean;
+  isViceCaptain: boolean;
+  multiplier: number;
+  salesRs: number;
+  brRs: number;
+  repeatCount: number;
+  pogRs: number;
+  salesPts: number;
+  brPts: number;
+  repeatPts: number;
+  pogPts: number;
+  rawPts: number;
+  finalPoints: number;
 }
 
 export interface TeamScore {
   total: number;
-  breakdown: {
-    productId: string;
-    basePoints: number;
-    isCaptain: boolean;
-    isViceCaptain: boolean;
-    finalPoints: number;
-  }[];
+  breakdown: ScoreBreakdown[];
 }
 
-export function scoreTeam(team: Team, productsById: Map<string, Product>, monthId = CURRENT_MONTH_ID): TeamScore {
-  const breakdown = team.picks.map((pick) => {
+export function productRawScore(
+  stat: ProductSalesStat | undefined,
+  retailerPogRs: number,
+): { salesPts: number; brPts: number; repeatPts: number; pogPts: number; raw: number } {
+  const salesRs = stat?.salesRs ?? 0;
+  const brRs = stat?.brRs ?? 0;
+  const repeat = stat?.repeatCount ?? 0;
+  const salesPts = Math.floor(salesRs / 100) * POINTS_PER_100_SALES;
+  const brPts = Math.floor(brRs / 100) * POINTS_PER_100_BR;
+  const repeatPts = repeat * POINTS_PER_REPEAT;
+  const pogPts = Math.floor((retailerPogRs || 0) / 100) * POINTS_PER_100_POG;
+  return { salesPts, brPts, repeatPts, pogPts, raw: salesPts + brPts + repeatPts + pogPts };
+}
+
+export function scoreTeam(
+  team: Team,
+  productsById: Map<string, Product>,
+  salesByProduct: Map<string, ProductSalesStat>,
+  pogForRetailer: Map<string, number>,
+): TeamScore {
+  const breakdown: ScoreBreakdown[] = team.picks.map((pick) => {
     const p = productsById.get(pick.productId);
-    if (!p) {
-      return { productId: pick.productId, basePoints: 0, isCaptain: false, isViceCaptain: false, finalPoints: 0 };
-    }
-    const base = productMonthPoints(p, monthId);
-    const isC = p.id === team.captainId;
-    const isVC = p.id === team.viceCaptainId;
+    const stat = salesByProduct.get(pick.productId);
+    const pogRs = pogForRetailer.get(pick.productId) ?? 0;
+    const isC = pick.productId === team.captainId;
+    const isVC = pick.productId === team.viceCaptainId;
     const multiplier = isC ? 2 : isVC ? 1.5 : 1;
+    const { salesPts, brPts, repeatPts, pogPts, raw } = productRawScore(stat, pogRs);
     return {
-      productId: p.id,
-      basePoints: base,
+      productId: pick.productId,
       isCaptain: isC,
       isViceCaptain: isVC,
-      finalPoints: base * multiplier,
+      multiplier,
+      salesRs: stat?.salesRs ?? 0,
+      brRs: stat?.brRs ?? 0,
+      repeatCount: stat?.repeatCount ?? 0,
+      pogRs,
+      salesPts,
+      brPts,
+      repeatPts,
+      pogPts,
+      rawPts: raw,
+      finalPoints: raw * multiplier,
+      ...(p ? {} : {}),
     };
   });
   const total = breakdown.reduce((acc, b) => acc + b.finalPoints, 0);
